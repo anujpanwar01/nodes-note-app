@@ -1,0 +1,54 @@
+name: Build creation
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  
+on:
+  push:
+    branches:
+      - "master"
+  pull_request:
+    branches:
+      - "**"    
+jobs:
+   build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3  # Check out the repository
+
+      - name: Use Node.js 20.18.0
+        uses: actions/setup-node@v1
+        with:
+          node-version: 20.18.0
+
+      - name: Install packages
+        run: npm i
+     
+      - name: Create Prod build
+        run: npm run build  
+
+      - name: comment in thread
+        run: |
+         prod_size=$(du -sh build/ | awk '{print $1}')
+         echo "PROD_SIZE=$prod_size" >> $GITHUB_ENV
+
+      - name: Comment PR
+        uses: actions/github-script@v6
+        with:
+           github-token: ${{secrets.GITHUB_TOKEN}}
+           script: |
+             github.rest.issues.createComment({
+               issue_number: context.issue.number,
+               owner: context.repo.owner,
+               repo: context.repo.repo,
+               body: `## 📦 Build Size Report
+               
+               | Build Type | Size |
+               |-----------|------|
+               | Production Build | ${process.env.PROD_SIZE} 
+               
+               *Automated build size tracking*`
+             })
