@@ -6,17 +6,21 @@ permissions:
 
 on:
   push:
-    branches: [master]
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - "**"
 
 jobs:
   comment-build-size:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Build Project
         run: npm run build
-      
+
       - name: Calculate Build Size
         run: |
           prod_size=$(du -sh build/ | awk '{print $1}')
