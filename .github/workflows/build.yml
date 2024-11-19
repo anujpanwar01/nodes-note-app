@@ -1,54 +1,50 @@
-name: Build creation
+name: Build Size Comment
 
 permissions:
   contents: read
   pull-requests: write
-  issues: write
 
 on:
   push:
-    branches:
-      - "**"    
-  pull_request:
-    branches:
-      - "**"    
+    branches: [master]
+
 jobs:
-   build:
+  comment-build-size:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3  # Check out the repository
-
-      - name: Use Node.js 20.18.0
-        uses: actions/setup-node@v1
-        with:
-          node-version: 20.18.0
-
-      - name: Install packages
-        run: npm i
-     
-      - name: Create Prod build
-        run: npm run build  
-
-      - name: comment in thread
+      - uses: actions/checkout@v3
+      
+      - name: Build Project
+        run: npm run build
+      
+      - name: Calculate Build Size
         run: |
-         prod_size=$(du -sh build/ | awk '{print $1}')
-         echo "PROD_SIZE=$prod_size" >> $GITHUB_ENV
+          prod_size=$(du -sh build/ | awk '{print $1}')
+          echo "PROD_SIZE=$prod_size" >> $GITHUB_ENV
 
-      - name: Comment PR
+      - name: Find and Comment on PR
         uses: actions/github-script@v6
         with:
-           github-token: ${{secrets.GITHUB_TOKEN}}
-           script: |
-             github.rest.issues.createComment({
-               issue_number: context.issue.number,
-               owner: context.repo.owner,
-               repo: context.repo.repo,
-               body: `## 📦 Build Size Report
-               
-               | Build Type | Size |
-               |-----------|------|
-               | Production Build | ${process.env.PROD_SIZE} 
-               
-               *Automated build size tracking*`
-             })
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            const { repo, owner } = context.repo;
+            const prs = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: 'open',
+              base: 'master'
+            });
+
+            if (prs.data.length > 0) {
+              const prNumber = prs.data[0].number;
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body: `## 📦 Production Build Size
+
+                Total Size: ${process.env.PROD_SIZE}
+
+                *Automated build size tracking*`
+              });
+            }
